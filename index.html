@@ -1,10 +1,11 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Roblox Verification</title>
+    <title>Sheriff Login - Roblox Verification</title>
 
     <style>
         * {
@@ -15,21 +16,28 @@
             margin: 0;
             min-height: 100vh;
 
-            font-family: Arial, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
 
             background:
-                radial-gradient(circle at top, #202020, #0d0d0d);
+                radial-gradient(
+                    circle at top,
+                    #252525 0%,
+                    #111111 45%,
+                    #080808 100%
+                );
 
             color: white;
 
             display: flex;
             justify-content: center;
             align-items: center;
+
+            padding: 20px;
         }
 
         .container {
-            width: 420px;
-            max-width: 90%;
+            width: 430px;
+            max-width: 100%;
 
             background: #181818;
 
@@ -42,12 +50,12 @@
             text-align: center;
 
             box-shadow:
-                0 20px 60px rgba(0, 0, 0, 0.5);
+                0 20px 60px rgba(0, 0, 0, 0.55);
         }
 
-        .icon {
-            width: 80px;
-            height: 80px;
+        .logo {
+            width: 90px;
+            height: 90px;
 
             margin: 0 auto 20px;
 
@@ -56,90 +64,235 @@
             background: #00a2ff;
 
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
 
-            font-size: 40px;
+            font-size: 45px;
+
+            overflow: hidden;
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+
+            object-fit: cover;
         }
 
         h1 {
-            margin: 0 0 12px;
+            margin: 0 0 10px;
 
             font-size: 28px;
         }
 
-        p {
+        .subtitle {
+            margin: 0 0 30px;
+
             color: #aaa;
 
             line-height: 1.5;
-
-            margin-bottom: 28px;
         }
 
-        .roblox-button {
+        label {
             display: block;
 
+            text-align: left;
+
+            margin-bottom: 8px;
+
+            color: #ddd;
+
+            font-size: 14px;
+
+            font-weight: bold;
+        }
+
+        input {
             width: 100%;
 
+            padding: 14px;
+
+            border-radius: 9px;
+
+            border: 1px solid #444;
+
+            background: #101010;
+
+            color: white;
+
+            font-size: 16px;
+
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #00a2ff;
+        }
+
+        button {
+            width: 100%;
+
+            margin-top: 18px;
+
             padding: 15px;
+
+            border: none;
+
+            border-radius: 9px;
 
             background: #00a2ff;
 
             color: white;
 
-            border-radius: 9px;
-
-            text-decoration: none;
-
             font-size: 17px;
 
             font-weight: bold;
 
+            cursor: pointer;
+
             transition: 0.2s;
         }
 
-        .roblox-button:hover {
+        button:hover {
             background: #008ed6;
 
             transform: translateY(-1px);
         }
 
+        button:disabled {
+            background: #555;
+
+            cursor: not-allowed;
+
+            transform: none;
+        }
+
+        .result {
+            margin-top: 25px;
+
+            padding: 18px;
+
+            border-radius: 10px;
+
+            display: none;
+        }
+
+        .result.loading {
+            display: block;
+
+            background: #202020;
+
+            color: #bbb;
+        }
+
+        .result.error {
+            display: block;
+
+            background: #351919;
+
+            border: 1px solid #642525;
+
+            color: #ff9b9b;
+        }
+
+        .result.success {
+            display: block;
+
+            background: #14291c;
+
+            border: 1px solid #28613a;
+
+            color: #b8ffc9;
+        }
+
+        .verified .check {
+            width: 55px;
+            height: 55px;
+
+            margin: 0 auto 12px;
+
+            border-radius: 50%;
+
+            background: #22c55e;
+
+            color: white;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .verified h2 {
+            margin: 5px 0 8px;
+
+            color: #6eff91;
+        }
+
+        .verified p {
+            margin: 6px 0;
+        }
+
+        .roblox-id {
+            font-size: 13px;
+
+            color: #8fba99;
+        }
+
         .notice {
-            margin-top: 20px;
+            margin-top: 22px;
+
+            color: #666;
 
             font-size: 12px;
 
-            color: #777;
+            line-height: 1.5;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="container">
+    <main class="container">
 
-        <div class="icon">
+        <div class="logo">
             🎮
         </div>
 
-        <h1>Roblox Verification</h1>
+        <h1>Sheriff Login</h1>
 
-        <p>
-            Connect your Roblox account to verify that you own the account.
+        <p class="subtitle">
+            Verify your Roblox account to continue.
         </p>
 
-        <a
-            class="roblox-button"
-            href="https://YOUR-RENDER-SERVICE.onrender.com/login/roblox"
+        <label for="username">
+            Roblox Username
+        </label>
+
+        <input
+            id="username"
+            type="text"
+            placeholder="Enter your Roblox username"
+            autocomplete="off"
         >
-            Login with Roblox
-        </a>
 
-        <div class="notice">
-            You will be redirected to Roblox to authorize the connection.
-        </div>
+        <button id="verifyButton">
+            Verify Roblox Account
+        </button>
 
-    </div>
+        <div id="result" class="result"></div>
+
+        <p class="notice">
+            Your Roblox password is never requested.
+            Verification is handled securely through our server.
+        </p>
+
+    </main>
+
+    <script src="script.js"></script>
 
 </body>
 </html>
+```
