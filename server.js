@@ -1,8 +1,13 @@
 const express = require("express");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
+
+// Temporary verification challenges.
+// Challenges expire after 15 minutes.
+const pendingVerifications = new Map();
 
 app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -22,7 +27,7 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 
 app.get("/", (req, res) => {
     res.json({
@@ -31,76 +36,165 @@ app.get("/", (req, res) => {
     });
 });
 
-app.post("/api/verify", async (req, res) => {
-    try {
-        const { username } = req.body;
+// Find a Roblox account by username.
+async function findRobloxUser(username) {
+    const response = await fetch(
+        "https://users.roblox.com/v1/usernames/users",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(ROBLOX_API_KEY
+                    ? { "x-api-key": ROBLOX_API_KEY }
+                    : {})
+            },
+            body: JSON.stringify({
+                usernames: [username],
+                excludeBannedUsers: false
+            })
+        }
+    );
 
-        if (!username || typeof username !== "string") {
+    if (!response.ok) {
+        throw new Error("Roblox username lookup failed.");
+    }
+
+    const data = await response.json();
+
+    return data.data?.[0] || null;
+}
+
+// STEP 1: Generate an ownership verification code.
+app.post("/api/start-verification", async (req, res) => {
+    try {
+        const username = req.body?.username;
+
+        if (
+            typeof username !== "string" ||
+            username.trim().length < 3 ||
+            username.trim().length > 20
+        ) {
             return res.status(400).json({
-                verified: false,
-                message: "Please enter a Roblox username."
+                success: false,
+                message: "Enter a valid Roblox username."
             });
         }
 
-        if (!ROBLOX_API_KEY) {
-            return res.status(500).json({
+        const user = await findRobloxUser(username.trim());
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Roblox username not found."
+            });
+        }
+
+        const code =
+            "SHERIFF-" +
+            crypto.randomBytes(4).toString("hex").toUpperCase();
+
+        pendingVerifications.set(user.id, {
+            code,
+            expiresAt: Date.now() + 15 * 60 * 1000
+        });
+
+        res.json({
+            success: true,
+            username: user.name,
+            userId: user.id,
+            code,
+            instructions:
+                "Add this code to your Roblox profile description, then return here to verify ownership.",
+            expiresInMinutes: 15
+        });
+
+    } catch (error) {
+        console.error("Start verification error:", error);
+
+        res.status(502).json({
+            success: false,
+            message: "Could not contact Roblox. Please try again."
+        });
+    }
+});
+
+// STEP 2: Check the code against the public Roblox profile.
+app.post("/api/confirm-verification", async (req, res) => {
+    try {
+        const { userId, code } = req.body || {};
+
+        if (
+            !Number.isSafeInteger(userId) ||
+            typeof code !== "string" ||
+            code.length > 40
+        ) {
+            return res.status(400).json({
                 verified: false,
-                message: "Server API key is not configured."
+                message: "Invalid verification request."
+            });
+        }
+
+        const pending = pendingVerifications.get(userId);
+
+        if (!pending || pending.code !== code) {
+            return res.status(400).json({
+                verified: false,
+                message: "Verification code is invalid. Start again."
+            });
+        }
+
+        if (Date.now() > pending.expiresAt) {
+            pendingVerifications.delete(userId);
+
+            return res.status(400).json({
+                verified: false,
+                message: "Your code expired. Start verification again."
             });
         }
 
         const response = await fetch(
-            "https://users.roblox.com/v1/usernames/users",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-api-key": ROBLOX_API_KEY
-                },
-                body: JSON.stringify({
-                    usernames: [username.trim()],
-                    excludeBannedUsers: false
-                })
-            }
+            `https://users.roblox.com/v1/users/${userId}`
         );
 
         if (!response.ok) {
-            console.error("Roblox API status:", response.status);
-
             return res.status(502).json({
                 verified: false,
-                message: "Roblox account lookup failed. Please try again."
+                message: "Could not read the Roblox profile. Try again."
             });
         }
 
-        const data = await response.json();
+        const profile = await response.json();
 
-        if (!data.data || data.data.length === 0) {
-            return res.status(404).json({
+        if (
+            typeof profile.description !== "string" ||
+            !profile.description.includes(pending.code)
+        ) {
+            return res.json({
                 verified: false,
-                message: "That Roblox username was not found."
+                message:
+                    "Code not found in your Roblox profile description. Add it and try again."
             });
         }
 
-        const user = data.data[0];
+        pendingVerifications.delete(userId);
 
         res.json({
             verified: true,
-            username: user.name,
-            displayName: user.displayName,
-            userId: user.id
+            username: profile.name,
+            displayName: profile.displayName,
+            userId: profile.id
         });
 
     } catch (error) {
-        console.error("Verification error:", error);
+        console.error("Confirm verification error:", error);
 
         res.status(500).json({
             verified: false,
-            message: "An unexpected server error occurred."
+            message: "An unexpected error occurred."
         });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Sheriff Login server running on port ${PORT}`);
+    console.log(`Sheriff Login running on port ${PORT}`);
 });
