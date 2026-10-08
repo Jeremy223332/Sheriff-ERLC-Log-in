@@ -1,86 +1,84 @@
+const API_URL = "https://sheriff-erlc-log-in.onrender.com";
+
 const verifyButton = document.getElementById("verifyButton");
 const usernameInput = document.getElementById("username");
 const result = document.getElementById("result");
 
-let verificationUserId = null;
-let verificationCode = null;
+let currentUserId = null;
+let currentCode = null;
 
-verifyButton.addEventListener("click", async () => {
+verifyButton.addEventListener("click", startVerification);
+
+async function startVerification() {
     const username = usernameInput.value.trim();
 
     if (!username) {
-        showResult("Please enter your Roblox username.", "error");
+        showMessage("Please enter your Roblox username.", "error");
         return;
     }
 
-    verifyButton.disabled = true;
-    verifyButton.textContent = "Generating code...";
+    setLoading(true, "Finding Roblox account...");
+    showMessage("Contacting Sheriff Login server...", "loading");
 
     try {
-        const response = await fetch(
-            "https://sheriff-erlc-log-in.onrender.com/api/start-verification",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ username })
-            }
-        );
+        const response = await fetch(`${API_URL}/api/start-verification`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ username })
+        });
 
         const data = await response.json();
 
         if (!response.ok || !data.success) {
-            throw new Error(data.message || "Could not start verification.");
+            throw new Error(data.message || `Server returned ${response.status}`);
         }
 
-        verificationUserId = data.userId;
-        verificationCode = data.code;
+        currentUserId = data.userId;
+        currentCode = data.code;
 
         result.className = "result loading";
         result.innerHTML = `
             <h2>One more step!</h2>
-            <p>We found your Roblox account: <strong>${escapeHTML(data.username)}</strong></p>
+            <p>Account found: <strong>${escapeHTML(data.username)}</strong></p>
             <p>Add this code to your Roblox profile description:</p>
-            <p style="font-size:22px;font-weight:bold;word-break:break-word">
+            <p id="verificationCode" style="font-size:22px;font-weight:bold;overflow-wrap:anywhere">
                 ${escapeHTML(data.code)}
             </p>
             <button id="copyCodeButton" type="button">Copy Code</button>
-            <p>1. Open your Roblox profile and edit your About/description.</p>
-            <p>2. Add the code above and save your profile.</p>
-            <p>3. Return here and click the button below.</p>
+            <p>1. Open your Roblox profile.</p>
+            <p>2. Edit your profile's About/description and add the code.</p>
+            <p>3. Save your profile, return here, and verify.</p>
             <button id="confirmButton" type="button">Verify Ownership</button>
         `;
 
-        document.getElementById("copyCodeButton").addEventListener("click", async () => {
-            try {
-                await navigator.clipboard.writeText(verificationCode);
-                document.getElementById("copyCodeButton").textContent = "Copied!";
-            } catch {
-                showResult(
-                    "Copy failed. Select and copy the code manually.",
-                    "error"
-                );
-            }
-        });
-
+        document.getElementById("copyCodeButton").addEventListener("click", copyCode);
         document.getElementById("confirmButton").addEventListener("click", confirmOwnership);
 
     } catch (error) {
-        console.error(error);
-        showResult(
-            error.message || "The verification server is currently unavailable.",
+        console.error("Start verification error:", error);
+        showMessage(
+            `Could not start verification: ${error.message}. Check the server and try again.`,
             "error"
         );
     } finally {
-        verifyButton.disabled = false;
-        verifyButton.textContent = "Verify Roblox Account";
+        setLoading(false);
     }
-});
+}
+
+async function copyCode() {
+    try {
+        await navigator.clipboard.writeText(currentCode);
+        document.getElementById("copyCodeButton").textContent = "Copied!";
+    } catch {
+        showMessage("Copy failed. Select the code and copy it manually.", "error");
+    }
+}
 
 async function confirmOwnership() {
-    if (!verificationUserId || !verificationCode) {
-        showResult("Please start verification again.", "error");
+    if (!currentUserId || !currentCode) {
+        showMessage("Start verification again to get a new code.", "error");
         return;
     }
 
@@ -89,46 +87,43 @@ async function confirmOwnership() {
     confirmButton.textContent = "Checking profile...";
 
     try {
-        const response = await fetch(
-            "https://sheriff-erlc-log-in.onrender.com/api/confirm-verification",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    userId: verificationUserId,
-                    code: verificationCode
-                })
-            }
-        );
+        const response = await fetch(`${API_URL}/api/confirm-verification`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                userId: currentUserId,
+                code: currentCode
+            })
+        });
 
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || "Ownership check failed.");
+            throw new Error(data.message || `Server returned ${response.status}`);
         }
 
         if (data.verified) {
-            showResult(`
+            showMessage(`
                 <div class="verified">
                     <div class="check">✓</div>
                     <h2>Ownership Verified!</h2>
-                    <p><strong>${escapeHTML(data.username)}</strong> controls the account that displayed the code.</p>
+                    <p><strong>${escapeHTML(data.username)}</strong> proved control of the Roblox profile.</p>
                     <p class="roblox-id">Roblox ID: ${escapeHTML(String(data.userId))}</p>
                 </div>
             `, "success");
 
-            verificationUserId = null;
-            verificationCode = null;
+            currentUserId = null;
+            currentCode = null;
         } else {
-            showResult(escapeHTML(data.message || "Code not found yet. Save it to your profile and try again."), "error");
+            showMessage(escapeHTML(data.message || "Code not found yet. Save it to your profile and try again."), "error");
         }
 
     } catch (error) {
-        console.error(error);
-        showResult(
-            error.message || "The verification server is currently unavailable.",
+        console.error("Confirm verification error:", error);
+        showMessage(
+            `Could not check ownership: ${error.message}. Please try again.`,
             "error"
         );
     } finally {
@@ -140,9 +135,14 @@ async function confirmOwnership() {
     }
 }
 
-function showResult(message, type) {
+function showMessage(message, type) {
     result.className = `result ${type}`;
     result.innerHTML = message;
+}
+
+function setLoading(loading, text = "Verify Roblox Account") {
+    verifyButton.disabled = loading;
+    verifyButton.textContent = loading ? text : "Verify Roblox Account";
 }
 
 function escapeHTML(value) {
