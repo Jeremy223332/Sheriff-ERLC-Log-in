@@ -17,7 +17,7 @@ verifyButton.addEventListener("click", async () => {
 
     try {
         const response = await fetch(
-            "https://YOUR-RENDER-URL.onrender.com/api/verify",
+            "https://sheriff-erlc-log-in.onrender.com/api/verify",
             {
                 method: "POST",
 
