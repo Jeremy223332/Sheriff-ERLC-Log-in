@@ -1,9 +1,26 @@
 const express = require("express");
 
 const app = express();
-
 const PORT = process.env.PORT || 3000;
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
+
+app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET, POST, OPTIONS"
+    );
+    res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type"
+    );
+
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+    }
+
+    next();
+});
 
 app.use(express.json());
 
@@ -15,22 +32,20 @@ app.get("/", (req, res) => {
 });
 
 app.post("/api/verify", async (req, res) => {
-
     try {
-
         const { username } = req.body;
 
-        if (!username) {
+        if (!username || typeof username !== "string") {
             return res.status(400).json({
                 verified: false,
-                message: "Roblox username is required."
+                message: "Please enter a Roblox username."
             });
         }
 
         if (!ROBLOX_API_KEY) {
             return res.status(500).json({
                 verified: false,
-                message: "Verification server is not configured."
+                message: "Server API key is not configured."
             });
         }
 
@@ -38,23 +53,23 @@ app.post("/api/verify", async (req, res) => {
             "https://users.roblox.com/v1/usernames/users",
             {
                 method: "POST",
-
                 headers: {
                     "Content-Type": "application/json",
                     "x-api-key": ROBLOX_API_KEY
                 },
-
                 body: JSON.stringify({
-                    usernames: [username],
+                    usernames: [username.trim()],
                     excludeBannedUsers: false
                 })
             }
         );
 
         if (!response.ok) {
+            console.error("Roblox API status:", response.status);
+
             return res.status(502).json({
                 verified: false,
-                message: "Roblox could not be reached."
+                message: "Roblox account lookup failed. Please try again."
             });
         }
 
@@ -77,12 +92,11 @@ app.post("/api/verify", async (req, res) => {
         });
 
     } catch (error) {
-
-        console.error(error);
+        console.error("Verification error:", error);
 
         res.status(500).json({
             verified: false,
-            message: "An unexpected error occurred."
+            message: "An unexpected server error occurred."
         });
     }
 });
